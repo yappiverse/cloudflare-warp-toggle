@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=WARP Wrapper
+Comment=Cloudflare WARP VPN connection
+Exec=SCRIPT_DIR_PLACEHOLDER/warp_toggle.py
+Path=SCRIPT_DIR_PLACEHOLDER
+Icon=SCRIPT_DIR_PLACEHOLDER/Cloudflare-WARP.webp
+Terminal=false
+Type=Application
+Categories=Network;Utility;
+Keywords=warp;cloudflare;vpn;wrapper
+StartupNotify=true
