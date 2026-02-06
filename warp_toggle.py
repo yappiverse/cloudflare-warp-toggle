@@ -29,16 +29,20 @@ class WarpToggleWindow(Gtk.Window):
         super().__init__(title=APP_NAME)
         self.set_default_size(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.set_resizable(False)
+        self.connect("destroy", self._on_destroy)
         self.set_position(Gtk.WindowPosition.CENTER)
         
         self._apply_styles()
         self._build_ui()
         
-        
+        self.destroyed = False
         GLib.idle_add(self._update_all)
         
-        
         GLib.timeout_add_seconds(REFRESH_INTERVAL_SECONDS, self._auto_refresh)
+    
+    def _on_destroy(self, widget):
+        """Handle window destruction"""
+        self.destroyed = True
     
     def _apply_styles(self):
         """Apply CSS styling and respect system theme"""
@@ -84,15 +88,12 @@ class WarpToggleWindow(Gtk.Window):
         except Exception:
             pass  # Not on GNOME or setting not available
         
-        # Method 3: Check GTK's prefer-dark-theme property
-        if self._gtk_settings.get_property('gtk-application-prefer-dark-theme'):
-            return True
-        
         return False
     
     def _update_theme_preference(self):
         """Update GTK theme preference based on system setting"""
         prefer_dark = self._detect_dark_theme()
+        # print(f"DEBUG: Detect dark theme result: {prefer_dark}")
         self._gtk_settings.set_property("gtk-application-prefer-dark-theme", prefer_dark)
     
     def _on_theme_changed(self, settings, key):
@@ -163,7 +164,11 @@ class WarpToggleWindow(Gtk.Window):
     
     def _auto_refresh(self):
         """Auto-refresh connection status"""
+        if getattr(self, 'destroyed', False):
+            return False
+            
         self.connection_tab.update_status()
+        self.settings_tab.update_mode()
         return True
     
     def _on_status_change(self):

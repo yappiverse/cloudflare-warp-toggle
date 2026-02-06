@@ -32,11 +32,75 @@ class SettingsTab(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.set_name("tab-content")
         
+        self.connect("destroy", self._on_destroy)
+        self.destroyed = False
+        
         self._on_mode_change = on_mode_change
         self._current_mode = 'warp'
         self._is_applying = False
         
         self._build_ui()
+    
+    def _on_destroy(self, widget):
+        """Handle destruction"""
+        self.destroyed = True
+
+
+    def _apply_settings(self, mode, families, dns_log, wifi_trusted, eth_trusted, protocol):
+        """Apply fetched settings to UI (runs on main thread)"""
+        if self.destroyed or not self.mode_combo.get_visible():
+            return
+
+        # Mode
+        self._current_mode = mode
+        self.mode_combo.set_active_id(mode)
+        
+        # Families
+        self.families_combo.set_active_id(families)
+        
+        # DNS Logging
+        # Block signals to avoid triggering setters
+        self.dns_logging_switch.handler_block_by_func(self._on_dns_logging_changed)
+        self.dns_logging_switch.set_active(dns_log)
+        self.dns_logging_switch.handler_unblock_by_func(self._on_dns_logging_changed)
+        
+        # WiFi
+        self.wifi_switch.handler_block_by_func(self._on_wifi_trusted_changed)
+        self.wifi_switch.set_active(wifi_trusted)
+        self.wifi_switch.handler_unblock_by_func(self._on_wifi_trusted_changed)
+        
+        # Ethernet
+        self.eth_switch.handler_block_by_func(self._on_eth_trusted_changed)
+        self.eth_switch.set_active(eth_trusted)
+        self.eth_switch.handler_unblock_by_func(self._on_eth_trusted_changed)
+        
+        # Protocol
+        self.protocol_combo.set_active_id(protocol)
+    
+    def update_mode(self):
+        """Update only mode (async)"""
+        import threading
+        
+        if getattr(self, '_is_updating_mode', False) or self.destroyed:
+            return
+            
+        self._is_updating_mode = True
+        
+        def fetch_mode():
+            try:
+                mode = warp_cli.get_mode()
+                if not self.destroyed:
+                    GLib.idle_add(self._safe_update_mode, mode)
+            finally:
+                self._is_updating_mode = False
+            
+        threading.Thread(target=fetch_mode, daemon=True).start()
+
+    def _safe_update_mode(self, mode):
+        """Safely update mode combo"""
+        if not self.destroyed and self.mode_combo.get_visible():
+            self.mode_combo.set_active_id(mode)
+
     
     def _build_ui(self):
         """Build the settings tab UI"""
@@ -364,17 +428,36 @@ class SettingsTab(Gtk.Box):
         if protocol:
             import threading
             threading.Thread(target=lambda: warp_cli.set_tunnel_protocol(protocol), daemon=True).start()
-    
+
     def update_mode(self):
-        """Update current mode display"""
-        self._current_mode = warp_cli.get_mode()
-        self.mode_combo.set_active_id(self._current_mode)
-    
+        """Update only mode (async)"""
+        import threading
+        
+        if getattr(self, '_is_updating_mode', False) or self.destroyed:
+            return
+            
+        self._is_updating_mode = True
+        
+        def fetch_mode():
+            try:
+                mode = warp_cli.get_mode()
+                if not self.destroyed:
+                    GLib.idle_add(self._safe_update_mode, mode)
+            finally:
+                self._is_updating_mode = False
+            
+        threading.Thread(target=fetch_mode, daemon=True).start()
+
+    def _safe_update_mode(self, mode):
+        """Safely update mode combo"""
+        if not self.destroyed and self.mode_combo.get_visible():
+            self.mode_combo.set_active_id(mode)
+
     def update_all(self):
         """Update all settings from current state"""
         import threading
         
-        if getattr(self, '_is_updating', False):
+        if getattr(self, '_is_updating', False) or self.destroyed:
             return
             
         self._is_updating = True
@@ -389,7 +472,8 @@ class SettingsTab(Gtk.Box):
                 eth_trusted = warp_cli.get_trusted_ethernet()
                 protocol = warp_cli.get_tunnel_protocol()
                 
-                GLib.idle_add(self._apply_settings, mode, families, dns_log, wifi_trusted, eth_trusted, protocol)
+                if not self.destroyed:
+                    GLib.idle_add(self._apply_settings, mode, families, dns_log, wifi_trusted, eth_trusted, protocol)
             finally:
                 self._is_updating = False
                 
@@ -397,6 +481,9 @@ class SettingsTab(Gtk.Box):
 
     def _apply_settings(self, mode, families, dns_log, wifi_trusted, eth_trusted, protocol):
         """Apply fetched settings to UI (runs on main thread)"""
+        if self.destroyed or not self.mode_combo.get_visible():
+            return
+
         # Mode
         self._current_mode = mode
         self.mode_combo.set_active_id(mode)
@@ -422,13 +509,3 @@ class SettingsTab(Gtk.Box):
         
         # Protocol
         self.protocol_combo.set_active_id(protocol)
-    
-    def update_mode(self):
-        """Update only mode (async)"""
-        import threading
-        
-        def fetch_mode():
-            mode = warp_cli.get_mode()
-            GLib.idle_add(lambda: self.mode_combo.set_active_id(mode))
-            
-        threading.Thread(target=fetch_mode, daemon=True).start()
