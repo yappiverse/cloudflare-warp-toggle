@@ -15,7 +15,7 @@ if RESULT_DIR not in sys.path:
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib, Gdk
+from gi.repository import Gtk, GLib, Gdk, Gio
 
 from src.styles import get_css_bytes
 from src.constants import APP_NAME, WINDOW_WIDTH, WINDOW_HEIGHT, REFRESH_INTERVAL_SECONDS
@@ -43,17 +43,21 @@ class WarpToggleWindow(Gtk.Window):
     def _apply_styles(self):
         """Apply CSS styling and respect system theme"""
         self._gtk_settings = Gtk.Settings.get_default()
+        self._gio_settings = None
         
-        
+        # Update theme preference
         self._update_theme_preference()
         
-        
+        # Try to monitor theme changes (GNOME-based DEs)
         try:
             from gi.repository import Gio
             self._gio_settings = Gio.Settings.new('org.gnome.desktop.interface')
             self._gio_settings.connect('changed::color-scheme', self._on_theme_changed)
-        except Exception as e:
-            print(f"Could not monitor theme changes: {e}")
+        except Exception:
+            pass  # Not on GNOME, theme monitoring not available
+        
+        # Monitor GTK theme changes (works on all DEs)
+        self._gtk_settings.connect('notify::gtk-theme-name', self._on_gtk_theme_changed)
         
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(get_css_bytes())
@@ -63,19 +67,40 @@ class WarpToggleWindow(Gtk.Window):
             screen, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
     
-    def _update_theme_preference(self):
-        """Update GTK theme preference based on system setting"""
+    def _detect_dark_theme(self):
+        """Detect if the system is using a dark theme (cross-DE compatible)"""
+        # Method 1: Check GTK theme name for "dark" indicator (works on all DEs)
+        theme_name = self._gtk_settings.get_property('gtk-theme-name')
+        if theme_name and 'dark' in theme_name.lower():
+            return True
+        
+        # Method 2: Check GNOME color-scheme setting (GNOME-based DEs)
         try:
             from gi.repository import Gio
             settings = Gio.Settings.new('org.gnome.desktop.interface')
             color_scheme = settings.get_string('color-scheme')
-            prefer_dark = 'dark' in color_scheme.lower()
-            self._gtk_settings.set_property("gtk-application-prefer-dark-theme", prefer_dark)
-        except:
-            pass
+            if 'dark' in color_scheme.lower():
+                return True
+        except Exception:
+            pass  # Not on GNOME or setting not available
+        
+        # Method 3: Check GTK's prefer-dark-theme property
+        if self._gtk_settings.get_property('gtk-application-prefer-dark-theme'):
+            return True
+        
+        return False
+    
+    def _update_theme_preference(self):
+        """Update GTK theme preference based on system setting"""
+        prefer_dark = self._detect_dark_theme()
+        self._gtk_settings.set_property("gtk-application-prefer-dark-theme", prefer_dark)
     
     def _on_theme_changed(self, settings, key):
-        """Handle system theme change"""
+        """Handle GNOME color-scheme change"""
+        self._update_theme_preference()
+    
+    def _on_gtk_theme_changed(self, settings, pspec):
+        """Handle GTK theme change (works on all DEs)"""
         self._update_theme_preference()
     
     def _build_ui(self):
@@ -150,11 +175,24 @@ class WarpToggleWindow(Gtk.Window):
         self.connection_tab.update_status()
 
 
+class WarpToggleApplication(Gtk.Application):
+    def __init__(self):
+        super().__init__(application_id="com.cloudflare.warp.toggle",
+                         flags=Gio.ApplicationFlags.FLAGS_NONE)
+        self.window = None
+
+    def do_activate(self):
+        if not self.window:
+            self.window = WarpToggleWindow()
+            self.window.set_application(self)
+            self.window.show_all()
+        
+        self.window.present()
+
 def main():
-    win = WarpToggleWindow()
-    win.connect("destroy", Gtk.main_quit)
-    win.show_all()
-    Gtk.main()
+    app = WarpToggleApplication()
+    exit_status = app.run(sys.argv)
+    sys.exit(exit_status)
 
 
 if __name__ == "__main__":

@@ -31,13 +31,13 @@ Cloudflare WARP Toggle is a Python GTK3 application that wraps the `warp-cli` co
 - **Families Mode**: Enable content filtering (malware, adult content)
 - **DNS Logging**: Toggle DNS query logging
 - **Protocol Selection**: Choose between WireGuard and MASQUE tunnel protocols
-- **System Theme Integration**: Automatically adapts to GNOME light/dark theme settings
+- **System Theme Integration**: Automatically adapts to system light/dark theme (works on all desktop environments)
 
 ## Requirements
 
 ### System Requirements
 
-- Linux operating system (tested on Debian/Ubuntu with GNOME)
+- Linux operating system (works on all desktop environments: GNOME, KDE Plasma, XFCE, Cinnamon, MATE, etc.)
 - Python 3.6 or later
 - GTK 3.0
 
@@ -252,11 +252,19 @@ warp-cli status
 
 ### Theme Not Applied
 
-The application reads the GNOME color scheme setting. Ensure your desktop environment properly sets the `org.gnome.desktop.interface color-scheme` gsetting. You can check with:
+The application detects dark themes using multiple methods for cross-DE compatibility:
+
+1. **GTK theme name** (all DEs): If your theme name contains "dark" (e.g., "Adwaita-dark", "Breeze-Dark")
+2. **GNOME color-scheme** (GNOME-based DEs): The `org.gnome.desktop.interface color-scheme` setting
+3. **GTK prefer-dark-theme** property: System-wide dark theme preference
+
+To verify your theme on GNOME-based DEs:
 
 ```bash
 gsettings get org.gnome.desktop.interface color-scheme
 ```
+
+On other DEs, ensure your GTK theme name contains "dark" for automatic detection.
 
 ### Desktop Entry Not Appearing
 
