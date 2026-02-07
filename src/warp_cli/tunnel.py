@@ -1,11 +1,19 @@
+"""WARP tunnel and network functions."""
+
+from __future__ import annotations
+
 from .core import run_command
 
 
-def get_tunnel_stats():
-    """Get tunnel statistics"""
+def get_tunnel_stats() -> dict[str, str]:
+    """Get tunnel statistics.
+    
+    Returns:
+        Dictionary with Protocol, Endpoint, Latency, Loss, Sent, Received keys
+    """
     output, success = run_command(['tunnel', 'stats'])
     
-    stats = {
+    stats: dict[str, str] = {
         'Protocol': '-',
         'Endpoint': '-',
         'Latency': '-',
@@ -35,8 +43,12 @@ def get_tunnel_stats():
     return stats
 
 
-def get_tunnel_protocol():
-    """Get current tunnel protocol"""
+def get_tunnel_protocol() -> str:
+    """Get current tunnel protocol.
+    
+    Returns:
+        Protocol string: 'auto', 'wireguard', or 'masque'
+    """
     output, success = run_command(['tunnel', 'protocol'])
     if success:
         output_lower = output.lower()
@@ -47,16 +59,27 @@ def get_tunnel_protocol():
     return 'auto'
 
 
-def set_tunnel_protocol(protocol):
-    """Set tunnel protocol (auto, wireguard, masque)"""
+def set_tunnel_protocol(protocol: str) -> tuple[str, bool]:
+    """Set tunnel protocol.
+    
+    Args:
+        protocol: 'auto', 'wireguard', or 'masque'
+        
+    Returns:
+        Tuple of (output, success)
+    """
     return run_command(['tunnel', 'protocol', protocol], timeout=10)
 
 
-def get_network_info():
-    """Get current network information"""
+def get_network_info() -> dict[str, str]:
+    """Get current network information.
+    
+    Returns:
+        Dictionary with Interface, IP, Gateway, DNS keys
+    """
     output, success = run_command(['debug', 'network'])
     
-    info = {
+    info: dict[str, str] = {
         'Interface': '-',
         'IP': '-',
         'Gateway': '-',
@@ -80,7 +103,11 @@ def get_network_info():
     return info
 
 
-def run_connectivity_check():
-    """Run connectivity check"""
+def run_connectivity_check() -> tuple[str, bool]:
+    """Run connectivity check.
+    
+    Returns:
+        Tuple of (output, success)
+    """
     output, success = run_command(['debug', 'connectivity-check'], timeout=30)
     return output, success

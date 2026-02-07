@@ -1,10 +1,18 @@
+"""WARP connection status functions."""
+
+from __future__ import annotations
+
 import re
 from ..constants import MODE_MAP, MODES
 from .core import run_command
 
 
-def get_status():
-    """Get connection status. Returns (is_connected, network_status)"""
+def get_status() -> tuple[bool, str]:
+    """Get connection status.
+    
+    Returns:
+        Tuple of (is_connected, network_status)
+    """
     output, success = run_command(['status'])
     
     is_connected = 'Connected' in output
@@ -18,9 +26,13 @@ def get_status():
     return is_connected, network_status
 
 
-def get_mode():
-    """Get current WARP mode"""
-    output, success = run_command(['settings', 'list'])
+def get_mode() -> str:
+    """Get current WARP mode.
+    
+    Returns:
+        Mode string (e.g., 'warp', 'doh', 'warp+doh')
+    """
+    output, _ = run_command(['settings', 'list'])
     
     for line in output.split('\n'):
         if 'Mode:' in line:
@@ -34,16 +46,31 @@ def get_mode():
     return 'warp'
 
 
-def connect():
-    """Connect to WARP"""
+def connect() -> tuple[str, bool]:
+    """Connect to WARP.
+    
+    Returns:
+        Tuple of (output, success)
+    """
     return run_command(['connect'], timeout=30)
 
 
-def disconnect():
-    """Disconnect from WARP"""
+def disconnect() -> tuple[str, bool]:
+    """Disconnect from WARP.
+    
+    Returns:
+        Tuple of (output, success)
+    """
     return run_command(['disconnect'], timeout=30)
 
 
-def set_mode(mode):
-    """Set WARP mode"""
+def set_mode(mode: str) -> tuple[str, bool]:
+    """Set WARP mode.
+    
+    Args:
+        mode: Mode to set (e.g., 'warp', 'doh', 'warp+doh')
+        
+    Returns:
+        Tuple of (output, success)
+    """
     return run_command(['mode', mode], timeout=30)
