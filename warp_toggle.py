@@ -5,6 +5,8 @@ Cloudflare WARP Toggle - GTK GUI for controlling WARP CLI on Linux
 Refactored modular version with minimalist UI
 """
 
+from __future__ import annotations
+
 import os
 import sys
 
@@ -20,12 +22,33 @@ from gi.repository import Gtk, GLib, Gdk, Gio
 from src.styles import get_css_bytes
 from src.constants import APP_NAME, WINDOW_WIDTH, WINDOW_HEIGHT, REFRESH_INTERVAL_SECONDS
 from src.tabs import ConnectionTab, SettingsTab, StatsTab, AccountTab
+from src import warp_cli
+from src.tray import TrayIcon
+
+
+def show_warp_not_found_dialog() -> None:
+    """Show error dialog when warp-cli is not found."""
+    dialog = Gtk.MessageDialog(
+        message_type=Gtk.MessageType.ERROR,
+        buttons=Gtk.ButtonsType.CLOSE,
+        text="WARP CLI Not Found"
+    )
+    dialog.format_secondary_text(
+        "The warp-cli command was not found. Please install Cloudflare WARP first.\n\n"
+        "Installation instructions:\n"
+        "1. Add Cloudflare GPG key and repository\n"
+        "2. sudo apt install cloudflare-warp\n"
+        "3. warp-cli registration new\n\n"
+        "See README.md for detailed instructions."
+    )
+    dialog.run()
+    dialog.destroy()
 
 
 class WarpToggleWindow(Gtk.Window):
     """Main application window"""
     
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(title=APP_NAME)
         self.set_default_size(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.set_resizable(False)
@@ -40,11 +63,11 @@ class WarpToggleWindow(Gtk.Window):
         
         GLib.timeout_add_seconds(REFRESH_INTERVAL_SECONDS, self._auto_refresh)
     
-    def _on_destroy(self, widget):
+    def _on_destroy(self, widget: Gtk.Widget) -> None:
         """Handle window destruction"""
         self.destroyed = True
     
-    def _apply_styles(self):
+    def _apply_styles(self) -> None:
         """Apply CSS styling and respect system theme"""
         self._gtk_settings = Gtk.Settings.get_default()
         self._gio_settings = None
@@ -54,7 +77,6 @@ class WarpToggleWindow(Gtk.Window):
         
         # Try to monitor theme changes (GNOME-based DEs)
         try:
-            from gi.repository import Gio
             self._gio_settings = Gio.Settings.new('org.gnome.desktop.interface')
             self._gio_settings.connect('changed::color-scheme', self._on_theme_changed)
         except Exception:
@@ -71,7 +93,7 @@ class WarpToggleWindow(Gtk.Window):
             screen, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
     
-    def _detect_dark_theme(self):
+    def _detect_dark_theme(self) -> bool:
         """Detect if the system is using a dark theme (cross-DE compatible)"""
         # Method 1: Check GTK theme name for "dark" indicator (works on all DEs)
         theme_name = self._gtk_settings.get_property('gtk-theme-name')
@@ -80,7 +102,6 @@ class WarpToggleWindow(Gtk.Window):
         
         # Method 2: Check GNOME color-scheme setting (GNOME-based DEs)
         try:
-            from gi.repository import Gio
             settings = Gio.Settings.new('org.gnome.desktop.interface')
             color_scheme = settings.get_string('color-scheme')
             if 'dark' in color_scheme.lower():
@@ -90,25 +111,23 @@ class WarpToggleWindow(Gtk.Window):
         
         return False
     
-    def _update_theme_preference(self):
+    def _update_theme_preference(self) -> None:
         """Update GTK theme preference based on system setting"""
         prefer_dark = self._detect_dark_theme()
-        # print(f"DEBUG: Detect dark theme result: {prefer_dark}")
         self._gtk_settings.set_property("gtk-application-prefer-dark-theme", prefer_dark)
     
-    def _on_theme_changed(self, settings, key):
+    def _on_theme_changed(self, settings: Gio.Settings, key: str) -> None:
         """Handle GNOME color-scheme change"""
         self._update_theme_preference()
     
-    def _on_gtk_theme_changed(self, settings, pspec):
+    def _on_gtk_theme_changed(self, settings: Gtk.Settings, pspec: object) -> None:
         """Handle GTK theme change (works on all DEs)"""
         self._update_theme_preference()
     
-    def _build_ui(self):
+    def _build_ui(self) -> None:
         """Build the main UI"""
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.add(main_box)
-        
         
         header = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         header.set_name("header-box")
@@ -135,10 +154,8 @@ class WarpToggleWindow(Gtk.Window):
         
         main_box.pack_start(header, False, False, 0)
         
-        
         self.notebook = Gtk.Notebook()
         main_box.pack_start(self.notebook, True, True, 0)
-        
         
         self.connection_tab = ConnectionTab(on_status_change=self._on_status_change)
         self.settings_tab = SettingsTab(on_mode_change=self._on_mode_change)
@@ -150,11 +167,10 @@ class WarpToggleWindow(Gtk.Window):
         self.notebook.append_page(self.stats_tab, Gtk.Label(label="Stats"))
         self.notebook.append_page(self.account_tab, Gtk.Label(label="Account"))
         
-        
         for i in range(4):
             self.notebook.child_set_property(self.notebook.get_nth_page(i), "tab-expand", True)
     
-    def _update_all(self):
+    def _update_all(self) -> bool:
         """Update all tabs"""
         self.connection_tab.update_status()
         self.settings_tab.update_all()
@@ -162,7 +178,7 @@ class WarpToggleWindow(Gtk.Window):
         self.account_tab.update_account()
         return False
     
-    def _auto_refresh(self):
+    def _auto_refresh(self) -> bool:
         """Auto-refresh connection status"""
         if getattr(self, 'destroyed', False):
             return False
@@ -171,30 +187,62 @@ class WarpToggleWindow(Gtk.Window):
         self.settings_tab.update_mode()
         return True
     
-    def _on_status_change(self):
+    def _on_status_change(self) -> None:
         """Handle connection status change"""
         self.stats_tab.update_all()
     
-    def _on_mode_change(self):
+    def _on_mode_change(self) -> None:
         """Handle mode change"""
         self.connection_tab.update_status()
 
 
 class WarpToggleApplication(Gtk.Application):
-    def __init__(self):
-        super().__init__(application_id="com.cloudflare.warp.toggle",
-                         flags=Gio.ApplicationFlags.FLAGS_NONE)
-        self.window = None
+    """Main GTK application with optional system tray."""
+    
+    def __init__(self) -> None:
+        super().__init__(
+            application_id="com.cloudflare.warp.toggle",
+            flags=Gio.ApplicationFlags.FLAGS_NONE
+        )
+        self.window: WarpToggleWindow | None = None
+        self.tray: TrayIcon | None = None
 
-    def do_activate(self):
+    def do_activate(self) -> None:
+        """Handle application activation."""
         if not self.window:
             self.window = WarpToggleWindow()
             self.window.set_application(self)
+            
+            # System tray disabled - GNOME doesn't support AppIndicator natively
+            # To enable, install: gnome-shell-extension-appindicator
+            # Then uncomment the block below:
+            #
+            # if TrayIcon.is_available():
+            #     self.tray = TrayIcon(
+            #         on_show_window=self._show_window,
+            #         on_quit=self.quit
+            #     )
+            #     self.tray.update_status()
+            
             self.window.show_all()
         
         self.window.present()
+    
+    def _show_window(self) -> None:
+        """Show the main window."""
+        if self.window:
+            self.window.present()
 
-def main():
+
+def main() -> None:
+    """Application entry point."""
+    # Check if warp-cli is available
+    if not warp_cli.is_warp_cli_available():
+        # Initialize GTK just for the error dialog
+        Gtk.init([])
+        show_warp_not_found_dialog()
+        sys.exit(1)
+    
     app = WarpToggleApplication()
     exit_status = app.run(sys.argv)
     sys.exit(exit_status)
