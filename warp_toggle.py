@@ -21,7 +21,7 @@ from gi.repository import Gtk, GLib, Gdk, Gio
 
 from src.styles import get_css_bytes
 from src.constants import APP_NAME, WINDOW_WIDTH, WINDOW_HEIGHT, REFRESH_INTERVAL_SECONDS
-from src.tabs import ConnectionTab, SettingsTab, StatsTab, AccountTab
+from src.tabs import ConnectionTab, SettingsTab, StatsTab, AccountTab, SetupTab
 from src import warp_cli
 from src.tray import TrayIcon
 
@@ -161,13 +161,15 @@ class WarpToggleWindow(Gtk.Window):
         self.settings_tab = SettingsTab(on_mode_change=self._on_mode_change)
         self.stats_tab = StatsTab()
         self.account_tab = AccountTab()
+        self.setup_tab = SetupTab(on_setup_complete=self._update_all)
         
         self.notebook.append_page(self.connection_tab, Gtk.Label(label="Connection"))
         self.notebook.append_page(self.settings_tab, Gtk.Label(label="Settings"))
         self.notebook.append_page(self.stats_tab, Gtk.Label(label="Stats"))
         self.notebook.append_page(self.account_tab, Gtk.Label(label="Account"))
+        self.notebook.append_page(self.setup_tab, Gtk.Label(label="Setup"))
         
-        for i in range(4):
+        for i in range(5):
             self.notebook.child_set_property(self.notebook.get_nth_page(i), "tab-expand", True)
     
     def _update_all(self) -> bool:
